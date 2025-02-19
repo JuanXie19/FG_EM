@@ -264,7 +264,7 @@ M_step <- function(x, W, y_expect_list, c_hat, r_hat, phi_hat, tau_hat){
   # update c_k, r_k, phi_k and tau_k for each cluster
   
   
-	for (k in 1: M){
+for (k in 1: M){
     y_expect_k <- y_expect_list[[k]]
 	
     # update c_k --> checked, correct
@@ -311,11 +311,14 @@ FG_EM <- function(x, M, max_iter, tol ){
   d <- ncol(x)
   
   ################### initialization
-  initialPars <- init_kmeans(x, M)
-  
+  initialPars <- initial_kmeans(x, M)  
   log_likelihood_vals <- numeric(max_iter)
-  
-  
+  pi_hat <- initialPars$pi_hat
+  c_hat <- initialPars$c_hat
+  r_hat <- initialPars$r_hat
+  sigma_sq <-initialPars$sigma_sq
+  phi_hat <- initialPars$phi_hat
+  tau_hat <- initialPars$tau_hat
   ############ EM iterations
   for (iter in 1: max_iter){
     message("iteration ", iter)
