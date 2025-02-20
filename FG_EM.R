@@ -158,6 +158,90 @@ newton_tau <- function(tau_init, phi_hat, y_expect_list, W){
 }
 
 
+### another version
+estimate_tau_k <- function(R_bar, p, max_iter = 100, tol = 1e-6) {
+  if (R_bar < 1e-10) {
+    return(0)  # Handle the case where R_bar is close to 0
+  }
+  
+  # Initial guess for tau_k
+  tau_k <- 1  # Start with a small positive value
+  
+  for (iter in 1:max_iter) {
+    # Compute A_p(tau_k) and its derivative
+    A_p_val <- A_p(tau_k, p)
+    A_p_deriv <- A_p_prime(tau_k, p)
+    
+    # Newton update
+    delta <- (A_p_val - R_bar) / A_p_deriv
+    tau_k_new <- tau_k - delta
+    
+    # Ensure tau_k remains non-negative
+    tau_k_new <- max(0, tau_k_new)
+    
+    # Check for convergence
+    if (abs(tau_k_new - tau_k) < tol) {
+      break
+    }
+    
+    tau_k <- tau_k_new
+  }
+  
+  return(tau_k)
+}
+
+
+
+
+
+## update tau based on yi, vMF
+update_tau <- function(x, W, c_hat, r_hat){
+  n <- nrow(x)
+  M <- ncol(W)
+  
+  # recover y_i and update tau_k
+  y <- matrix(0, nrow = n)
+  for(i in 1:n){
+    cluster_idx <- which.max(W[i,])
+    y_i <- (x[i,] - c_hat[cluster_idx,  ])/ r_hat[cluster_idx]
+    y[i, ] <- y_i/sqrt(sum(y_i^2)) # normalzied y_i
+  }
+  
+  tau_hat <- numeric(M)
+  
+  for (k in 1:M){
+    weighted_sum <- colSums(W[, k]*y)
+    R_bar <- sqrt(sum(weighted_sum^2)) / sum(gamma_ik[, k])
+    tau_hat[k] <- estimate_tau_k(R_bar, p)  # Use the function defined earlier
+  }
+  
+  return(tau_hat)
+  
+}
+
+
+### alternative way to update tau
+
+Q_tau <- function(tau, phi_k, Ey, W_k) {
+  d <- length(phi_k)
+  log_Cd_val <- log_Cd(tau, d)  # log(C_d(tau))
+  dot_products <- Ey %*% phi_k  # phi_k^T E[y_i | x_i, z_i = k]
+  Q <- sum(W_k * (log_Cd_val + tau * dot_products))
+  return(Q)
+}
+
+optimize_tau <- function(phi_k, Ey, W_k) {
+  # Define the negative Q function (since optimize minimizes by default)
+  neg_Q_tau <- function(tau) {
+    - Q_tau(tau, phi_k, Ey, W_k)
+  }
+  
+  # Find tau_k that maximizes Q(tau)
+  result <- optimize(neg_Q_tau, interval = c(1e-6, 100))  # Adjust interval as needed
+  return(result$minimum)
+}
+
+
 
 
 
@@ -283,9 +367,16 @@ for (k in 1: M){
     phi_hat[k, ] <- phi_hat[k, ] / norm_vec(phi_hat[k, ])
 	}
   
-  tau_update <- newton_tau(tau_hat, phi_hat, y_expect_list, W)
-  tau_hat <- tau_update
-	  
+  ##
+  #tau_update <- newton_tau(tau_hat, phi_hat, y_expect_list, W)
+  #tau_hat <- tau_update
+  
+	## alternative way to update tau
+  for (k in 1:M){
+    Ey_k <- y_expect_list[[k]]
+    W_k <- W[, k]
+    tau_hat[k] <- optimize_tau(phi_hat[k, ], Ey_k, W_k)
+  }
   
   # update sigma_sq --- checked, correct
     temp <- matrix(0, n, M)
@@ -311,7 +402,10 @@ FG_EM <- function(x, M, max_iter, tol ){
   d <- ncol(x)
   
   ################### initialization
-  initialPars <- initial_kmeans(x, M)  
+  initialPars <- initial_kmeans(x, M)
+  ## double check the original initialization
+  #initialPars <- initial_kmeans_opt1(x, M)
+  
   log_likelihood_vals <- numeric(max_iter)
   pi_hat <- initialPars$pi_hat
   c_hat <- initialPars$c_hat
@@ -349,6 +443,6 @@ FG_EM <- function(x, M, max_iter, tol ){
   }
   
   return(list(pi = pi_hat, c = c_hat, r = r_hat, phi = phi_hat, 
-              tau = tau_hat, sigma_sq = sigma_sq, log_likelihood = log_likelihood_vals))
+              tau = tau_hat, sigma_sq = sigma_sq, log_likelihood = log_likelihood_vals, W = W))
   
 }
