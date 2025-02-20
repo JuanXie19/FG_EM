@@ -33,7 +33,7 @@ log_Cd <- function(tau, d) {
   
   # Compute log_Cd(tau) for tau > 0
   log_tau <- ifelse(tau > 0, log(tau), 0)
-  bessel_term <- besselI(tau, nu = (d/2 - 1), expon.scaled = TRUE)
+  bessel_term <- besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)
   
   # Handle cases where bessel_term is zero or very small
   if (bessel_term <= 0) {
@@ -119,8 +119,8 @@ compute_y_expect <- function(x, M, phi, tau, c, r, sigma_sq) {
     
    
     # Compute A_d(kappa_k) using exponentially scaled Bessel functions for numerical stability
-    log_Ad_k <- log(besselI(kappa_k, d/2, expon.scaled = TRUE)) - 
-      log(besselI(kappa_k, d/2 - 1, expon.scaled = TRUE))
+    log_Ad_k <- log(besselI(kappa_k, d/2, expon.scaled = FALSE)) - 
+      log(besselI(kappa_k, d/2 - 1, expon.scaled = FALSE))
     Ad_k <- exp(log_Ad_k)
     Ad_k <- pmin(pmax(Ad_k, 1e-10), 1 - 1e-10)
     
@@ -144,7 +144,7 @@ newton_tau <- function(tau_init, phi_hat, y_expect_list, W){
     y_expect_k <- y_expect_list[[k]]
     
     for (i in 1:n){
-      Ad_tau_k <- besselI(tau_init[k], nu = d/2, expon.scaled = TRUE)/besselI(tau_init[k], d/2 - 1, expon.scaled = TRUE)
+      Ad_tau_k <- besselI(tau_init[k], nu = d/2, expon.scaled = FALSE)/besselI(tau_init[k], d/2 - 1, expon.scaled = FALSE)
       Ad_tau_k_prime <- 1 - Ad_tau_k^2 - (d-1)/tau_init[k]*Ad_tau_k
       dot_product <- sum(phi_k * y_expect_k[i,])
       NUMERATOR[i] <- W[i,k]*(Ad_tau_k - dot_product)
@@ -377,6 +377,24 @@ for (k in 1: M){
     W_k <- W[, k]
     tau_hat[k] <- optimize_tau(phi_hat[k, ], Ey_k, W_k)
   }
+  
+  
+  ### OPT3:
+  
+  for (k in 1:M){
+    Ey_k <- y_expect_list[[k]]
+    W_k <- W[, k]
+    temp <- optim(par = tau_init[k], 
+                  fn = Q_tau, 
+                  phi_k = phi_hat[k,], 
+                  Ey = Ey_k, 
+                  W_k = W_k, 
+                  method = "L-BFGS-B", 
+                  lower = 1e-2 )
+    tau_hat[k] <- temp$par
+  }
+  
+  
   
   # update sigma_sq --- checked, correct
     temp <- matrix(0, n, M)
