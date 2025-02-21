@@ -24,22 +24,17 @@ log_Cd <- function(tau, d) {
   # Handle the case where tau is zero
   if (tau == 0) {
     # For tau = 0, the vMF distribution is uniform on the sphere
-    # The normalizing constant is C_d(0) = 1 / SurfaceArea(S^{d-1})
-    # The surface area of S^{d-1} is 2 * pi^(d/2) / gamma(d/2)
-    # So log(C_d(0)) = -log(2 * pi^(d/2) / gamma(d/2))
+    # The normalizing constant is C_d(0) = gamma(d/2)/(2*pi^(d/2))
+    # So log(C_d(0)) = log(gamma(d/2)) - log(2) - (d/2)*log(pi)
     # lgamma computes the logarithm of the gamma function
     return(-log(2) - (d/2) * log(pi) + lgamma(d/2))
   }
   
   # Compute log_Cd(tau) for tau > 0
-  log_tau <- ifelse(tau > 0, log(tau), 0)
+  log_tau <- log(tau)
   bessel_term <- besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)
   
-  # Handle cases where bessel_term is zero or very small
-  if (bessel_term <= 0) {
-    return(-Inf)  # log(0) = -Inf
-  }
-  
+ 
   # Compute log_Cd(tau)
   res <- (d/2 - 1) * log_tau - log(bessel_term) - (d/2) * log(2*pi)
   return(res)
