@@ -367,12 +367,26 @@ for (k in 1: M){
   #tau_hat <- tau_update
   
 	## alternative way to update tau
-  
-  ## opt4: based on the formula(2) from the movMF package 
   for (k in 1:M){
-    rbar <- norm_vec(phi_hat[k])/pi_hat[k]
-    tau_hat[k] <- (rbar * d - rbar^3)/(1 - rbar^2)
-    
+    Ey_k <- y_expect_list[[k]]
+    W_k <- W[, k]
+    tau_hat[k] <- optimize_tau(phi_hat[k, ], Ey_k, W_k)
+  }
+  
+  
+  ### OPT3:
+  
+  for (k in 1:M){
+    Ey_k <- y_expect_list[[k]]
+    W_k <- W[, k]
+    temp <- optim(par = tau_init[k], 
+                  fn = Q_tau, 
+                  phi_k = phi_hat[k,], 
+                  Ey = Ey_k, 
+                  W_k = W_k, 
+                  method = "L-BFGS-B", 
+                  lower = 1e-2 )
+    tau_hat[k] <- temp$par
   }
   
   
