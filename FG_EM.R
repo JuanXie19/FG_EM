@@ -32,11 +32,12 @@ log_Cd <- function(tau, d) {
   
   # Compute log_Cd(tau) for tau > 0
   log_tau <- log(tau)
-  bessel_term <- besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)
-  
- 
+  #bessel_term <- besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)
   # Compute log_Cd(tau)
-  res <- (d/2 - 1) * log_tau - log(bessel_term) - (d/2) * log(2*pi)
+  #res <- (d/2 - 1) * log_tau - log(bessel_term) - (d/2) * log(2*pi)
+  #log_bessel <- log(besselI(tau, nu = (d/2 - 1), expon.scaled = TRUE)) + tau
+  log_bessel <- log(besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)) 
+  res <- (d/2 - 1) * log(tau) - log_bessel - (d/2) * log(2*pi)
   return(res)
 }
 
@@ -370,9 +371,11 @@ for (k in 1: M){
   
   ## opt4: based on the formula(2) from the movMF package 
   for (k in 1:M){
-    rbar <- norm_vec(phi_hat[k])/pi_hat[k]
-    tau_hat[k] <- (rbar * d - rbar^3)/(1 - rbar^2)
-    
+    #rbar <- norm_vec(phi_hat[k])/pi_hat[k]  # should not use pi_hat[k], but sum(W[, k]) instead
+    rbar <- norm_vec(colSums(W[, k] * y_expect_list[[k]])) / sum(W[, k])  # also not used phi_hat[k], as it is normalized, should use unnormalized phi_hat here
+    temp1 <- (rbar * d - rbar^3)/(1 - rbar^2)
+    tau_hat[k] <- pmax(temp1, 1e-6)
+
   }
   
   
@@ -444,4 +447,56 @@ FG_EM <- function(x, M, max_iter, tol ){
   return(list(pi = pi_hat, c = c_hat, r = r_hat, phi = phi_hat, 
               tau = tau_hat, sigma_sq = sigma_sq, log_likelihood = log_likelihood_vals, W = W))
   
+}
+
+
+### Given the FG-mixture results and a number N, this function generates N samples from estimated density, and also provides scatter plots with and withour error of the same
+plot_density_FGM <- function(N, rst)
+{
+  cntr <- rst$c
+  rd <- rst$r
+  mu <- Res1$mu; tau=Res1$tau; Lmbd=Res1$Sp_wgts; Pi=Res1$Kern_wgts; 
+  K=nrow(tau); M=ncol(tau);  D=nrow(cntr); sigma.sq=Res1$trace_sigma[length(Res1$trace_sigma)]
+  z=matrix(data=NA,nrow=N,ncol=D)
+  sp_label=sapply(1:N,function(u){v=rmultinom(n=1,size=1,prob = Lmbd); return(which.max(v))})
+  count=0
+  for(ii in 1:K)
+  {
+    idx1=which(sp_label==ii); 
+    if(length(idx1)>0)	
+    {
+      kr_label=sapply(1:length(idx1),function(u){v=rmultinom(n=1,size=1,prob=Pi[ii,]); return(which.max(v))})
+      for(jj in 1:M)
+      {
+        idx2=idx1[which(kr_label==jj)]; 
+        if(length(idx2)>0)
+        {
+          yy=rvmf(length(idx2),mu[,ii,jj],tau[ii,jj])
+          if(length(idx2)==1)
+          {
+            z[idx2,]=cntr[,ii]+rd[ii]*yy
+          }
+          else
+          {
+            z[idx2,]=t(apply(yy,1,function(u){return(cntr[,ii]+rd[ii]*u)})) 
+          }
+        }
+      }
+    }
+  }
+  error=mvrnorm(N,rep(0,D),sigma.sq*diag(D))
+  w=z+error
+  if(D==2)
+  {
+    par(mfrow=c(1,2))
+    plot(z[,1],z[,2],main="Without error",lwd=3,cex=.3)
+    plot(w[,1],w[,2],main="Predictive",lwd=3,cex=.3)
+  }
+  if(D==3)
+  {
+    library(plot3D)
+    scatter3D(z[,1],z[,2],z[,3],main="Without error",lwd=3,cex=.3)
+    scatter3D(w[,1],w[,2],w[,3],main="Predictive",lwd=3,cex=.3)
+  }
+  return(list(z,w))
 }
