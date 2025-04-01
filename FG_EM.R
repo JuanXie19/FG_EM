@@ -130,117 +130,6 @@ compute_y_expect <- function(x, M, phi, tau, c, r, sigma_sq) {
 }
 
 
-
-newton_tau <- function(tau_init, phi_hat, y_expect_list, W){
-  for (k in 1: M){
-    NUMERATOR <- numeric(n)
-    DENUMERATOR <- numeric(n)
-    phi_k <- phi_hat[k, ]
-    d <- length(phi_k)
-    y_expect_k <- y_expect_list[[k]]
-    
-    for (i in 1:n){
-      Ad_tau_k <- besselI(tau_init[k], nu = d/2, expon.scaled = FALSE)/besselI(tau_init[k], d/2 - 1, expon.scaled = FALSE)
-      Ad_tau_k_prime <- 1 - Ad_tau_k^2 - (d-1)/tau_init[k]*Ad_tau_k
-      dot_product <- sum(phi_k * y_expect_k[i,])
-      NUMERATOR[i] <- W[i,k]*(Ad_tau_k - dot_product)
-      DENUMERATOR[i] <- W[i,k]*Ad_tau_k_prime
-    }
-    gradient_tau_k <- sum(NUMERATOR)/sum(DENUMERATOR)
-    tau_hat[k] <- tau_init[k] - gradient_tau_k
-  }
-  return(tau_hat)
-  
-}
-
-
-### another version
-estimate_tau_k <- function(R_bar, p, max_iter = 100, tol = 1e-6) {
-  if (R_bar < 1e-10) {
-    return(0)  # Handle the case where R_bar is close to 0
-  }
-  
-  # Initial guess for tau_k
-  tau_k <- 1  # Start with a small positive value
-  
-  for (iter in 1:max_iter) {
-    # Compute A_p(tau_k) and its derivative
-    A_p_val <- A_p(tau_k, p)
-    A_p_deriv <- A_p_prime(tau_k, p)
-    
-    # Newton update
-    delta <- (A_p_val - R_bar) / A_p_deriv
-    tau_k_new <- tau_k - delta
-    
-    # Ensure tau_k remains non-negative
-    tau_k_new <- max(0, tau_k_new)
-    
-    # Check for convergence
-    if (abs(tau_k_new - tau_k) < tol) {
-      break
-    }
-    
-    tau_k <- tau_k_new
-  }
-  
-  return(tau_k)
-}
-
-
-
-
-
-## update tau based on yi, vMF
-update_tau <- function(x, W, c_hat, r_hat){
-  n <- nrow(x)
-  M <- ncol(W)
-  
-  # recover y_i and update tau_k
-  y <- matrix(0, nrow = n)
-  for(i in 1:n){
-    cluster_idx <- which.max(W[i,])
-    y_i <- (x[i,] - c_hat[cluster_idx,  ])/ r_hat[cluster_idx]
-    y[i, ] <- y_i/sqrt(sum(y_i^2)) # normalzied y_i
-  }
-  
-  tau_hat <- numeric(M)
-  
-  for (k in 1:M){
-    weighted_sum <- colSums(W[, k]*y)
-    R_bar <- sqrt(sum(weighted_sum^2)) / sum(gamma_ik[, k])
-    tau_hat[k] <- estimate_tau_k(R_bar, p)  # Use the function defined earlier
-  }
-  
-  return(tau_hat)
-  
-}
-
-
-### alternative way to update tau
-
-Q_tau <- function(tau, phi_k, Ey, W_k) {
-  d <- length(phi_k)
-  log_Cd_val <- log_Cd(tau, d)  # log(C_d(tau))
-  dot_products <- Ey %*% phi_k  # phi_k^T E[y_i | x_i, z_i = k]
-  Q <- sum(W_k * (log_Cd_val + tau * dot_products))
-  return(Q)
-}
-
-optimize_tau <- function(phi_k, Ey, W_k) {
-  # Define the negative Q function (since optimize minimizes by default)
-  neg_Q_tau <- function(tau) {
-    - Q_tau(tau, phi_k, Ey, W_k)
-  }
-  
-  # Find tau_k that maximizes Q(tau)
-  result <- optimize(neg_Q_tau, interval = c(1e-6, 100))  # Adjust interval as needed
-  return(result$minimum)
-}
-
-
-
-
-
 # Function to calculate the incomplete log-likelihood
 
 log_likelihood <- function(x, pi_hat, c_hat, r_hat, phi_hat, tau_hat, sigma_sq) {
@@ -444,8 +333,11 @@ FG_EM <- function(x, M, max_iter, tol ){
     
   }
   
+  p <- (M-1) + M*d + M + M*d + M + 1  # Total parameters
+  final_loglik <- tail(log_likelihood_vals, 1)  #
+  BIC <- -2 * final_loglik + p * log(n)
   return(list(pi = pi_hat, c = c_hat, r = r_hat, phi = phi_hat, 
-              tau = tau_hat, sigma_sq = sigma_sq, log_likelihood = log_likelihood_vals, W = W))
+              tau = tau_hat, sigma_sq = sigma_sq, log_likelihood = log_likelihood_vals, W = W, BIC = BIC))
   
 }
 
