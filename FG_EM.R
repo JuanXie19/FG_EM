@@ -451,52 +451,44 @@ FG_EM <- function(x, M, max_iter, tol ){
 
 
 ### Given the FG-mixture results and a number N, this function generates N samples from estimated density, and also provides scatter plots with and withour error of the same
-plot_density_FGM <- function(N, rst)
-{
+plot_density_FGM <- function(N, rst){
   cntr <- rst$c
   rd <- rst$r
-  mu <- Res1$mu; tau=Res1$tau; Lmbd=Res1$Sp_wgts; Pi=Res1$Kern_wgts; 
-  K=nrow(tau); M=ncol(tau);  D=nrow(cntr); sigma.sq=Res1$trace_sigma[length(Res1$trace_sigma)]
-  z=matrix(data=NA,nrow=N,ncol=D)
-  sp_label=sapply(1:N,function(u){v=rmultinom(n=1,size=1,prob = Lmbd); return(which.max(v))})
-  count=0
-  for(ii in 1:K)
-  {
-    idx1=which(sp_label==ii); 
-    if(length(idx1)>0)	
-    {
-      kr_label=sapply(1:length(idx1),function(u){v=rmultinom(n=1,size=1,prob=Pi[ii,]); return(which.max(v))})
-      for(jj in 1:M)
-      {
-        idx2=idx1[which(kr_label==jj)]; 
-        if(length(idx2)>0)
-        {
-          yy=rvmf(length(idx2),mu[,ii,jj],tau[ii,jj])
-          if(length(idx2)==1)
-          {
-            z[idx2,]=cntr[,ii]+rd[ii]*yy
+  phi <- rst$phi
+  tau <- rst$tau
+  Pi <- rst$pi
+  sigma.sq <- rst$sigma_sq
+  D <- ncol(cntr)
+  M <- length(tau)
+  
+  z <- matrix(data = NA,nrow = N,ncol = D)
+  
+  
+  kr_label <- sapply(1:N,function(u){v <- rmultinom(n = 1,size = 1,prob = Pi); return(which.max(v))})
+  for(k in 1:M){
+      idx <- which(kr_label == k)
+      if(length(idx) > 0){
+          yy <- rvmf(length(idx), phi[k, ],tau[k])
+          if(length(idx) == 1){
+            z[idx,] <- cntr[k, ] + rd[k] * yy
           }
-          else
-          {
-            z[idx2,]=t(apply(yy,1,function(u){return(cntr[,ii]+rd[ii]*u)})) 
+          else{
+            z[idx,] <- t(apply(yy, 1, function(u){return(cntr[k, ] + rd[k] * u)})) 
           }
-        }
       }
-    }
+      
   }
-  error=mvrnorm(N,rep(0,D),sigma.sq*diag(D))
-  w=z+error
-  if(D==2)
-  {
+  error <- mvrnorm(N, rep(0, D), sigma.sq * diag(D))
+  w <- z + error
+  if(D == 2){
     par(mfrow=c(1,2))
-    plot(z[,1],z[,2],main="Without error",lwd=3,cex=.3)
-    plot(w[,1],w[,2],main="Predictive",lwd=3,cex=.3)
+    plot(z[, 1], z[, 2],main = "Without error", lwd = 3,cex = .3)
+    plot(w[, 1], w[, 2],main = "Predictive", lwd = 3, cex = .3)
   }
-  if(D==3)
-  {
+  if(D == 3){
     library(plot3D)
-    scatter3D(z[,1],z[,2],z[,3],main="Without error",lwd=3,cex=.3)
-    scatter3D(w[,1],w[,2],w[,3],main="Predictive",lwd=3,cex=.3)
+    scatter3D(z[, 1],z[, 2],z[, 3],main = "Without error",lwd = 3,cex = .3)
+    scatter3D(w[, 1],w[, 2],w[, 3],main = "Predictive",lwd = 3,cex = .3)
   }
   return(list(z,w))
 }
