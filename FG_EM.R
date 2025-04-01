@@ -297,7 +297,7 @@ FG_EM <- function(x, M, max_iter, tol ){
   ## double check the original initialization
   #initialPars <- initial_kmeans_opt1(x, M)
   
-  log_likelihood_vals <- numeric(max_iter)
+  log_likelihood_vals <- rep(NA, max_iter) # use NA to distinguish unconverged iterations
   pi_hat <- initialPars$pi_hat
   c_hat <- initialPars$c_hat
   r_hat <- initialPars$r_hat
@@ -334,10 +334,12 @@ FG_EM <- function(x, M, max_iter, tol ){
     
   }
   
+  converged_loglik <- log_likelihood_vals[1:iter]
   return(list(
     pi = pi_hat, c = c_hat, r = r_hat, 
     phi = phi_hat, tau = tau_hat, sigma_sq = sigma_sq, 
-    log_likelihood = log_likelihood_vals[1:iter], 
+    log_likelihood = converged_loglik,
+    n_iter = iter,
     W = W))
 }
 
@@ -349,9 +351,9 @@ FG_EM_with_BIC <- function(x, M, max_iter, tol) {
   # Compute number of parameters (p)
   n <- nrow(x)
   d <- ncol(x)
-  p <- (M-1) + M*d + M + M*d + M + 1  
+  p <- (M-1) + M*d + M + M*d + M + 1  # π_k (M-1), c_k (M*d), r_k (M), φ_k (M*d), τ_k (M), σ² (1)
   
-  # Get final log-likelihood
+  # Use the LAST (converged) log-likelihood value
   final_loglik <- tail(fit$log_likelihood, 1)
   
   # Compute BIC
@@ -359,39 +361,42 @@ FG_EM_with_BIC <- function(x, M, max_iter, tol) {
   
   # Return model with BIC
   return(list(
-    pi = fit$pi, c = fit$c, r = fit$r, phi = fit$phi,
-    tau = fit$tau, sigma_sq = fit$sigma_sq,
-    log_likelihood = fit$log_likelihood,
-    W = fit$W,
+    model = fit,
     BIC = BIC,
-    n_parameters = p
+    n_parameters = p,
+    converged_iter = fit$n_iter
   ))
 }
 
-# Function to select best M based on BIC
-select_best_M <- function(x, M_range = 2:5, max_iter = 1000, tol = 1e-4) {
+# Updated model selection function
+select_best_M <- function(x, M_candidates = 2:5, max_iter = 100, tol = 1e-4) {
   results <- list()
-  BICs <- numeric(length(M_range))
+  BIC_df <- data.frame(M = M_candidates, 
+                       BIC = NA_real_,
+                       converged = NA,
+                       n_iter = NA)
   
-  for (i in seq_along(M_range)) {
-    M <- M_range[i]
-    message("Fitting M = ", M)
-    results[[i]] <- FG_EM_with_BIC(x, M, max_iter, tol)
-    BICs[i] <- results[[i]]$BIC
+  for (i in seq_along(M_candidates)) {
+    M <- M_candidates[i]
+    message("\nFitting M = ", M)
+    result <- FG_EM_with_BIC(x, M, max_iter, tol)
+    
+    results[[i]] <- result
+    BIC_df$BIC[i] <- result$BIC
+    BIC_df$converged[i] <- (result$model$n_iter < max_iter)
+    BIC_df$n_iter[i] <- result$model$n_iter
   }
   
   # Find best M (lowest BIC)
-  best_idx <- which.min(BICs)
-  best_M <- M_range[best_idx]
+  best_idx <- which.min(BIC_df$BIC)
   
   return(list(
-    best_model = results[[best_idx]],
-    all_results = results,
-    BICs = data.frame(M = M_range, BIC = BICs),
-    best_M = best_M
+    best_model = results[[best_idx]]$model,
+    best_M = M_candidates[best_idx],
+    all_models = results,
+    BIC_table = BIC_df
   ))
 }
-
 
 
 
