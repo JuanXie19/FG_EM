@@ -304,6 +304,7 @@ FG_EM <- function(x, M, max_iter, tol ){
   sigma_sq <-initialPars$sigma_sq
   phi_hat <- initialPars$phi_hat
   tau_hat <- initialPars$tau_hat
+  
   ############ EM iterations
   for (iter in 1: max_iter){
     message("iteration ", iter)
@@ -333,13 +334,65 @@ FG_EM <- function(x, M, max_iter, tol ){
     
   }
   
-  p <- (M-1) + M*d + M + M*d + M + 1  # Total parameters
-  final_loglik <- tail(log_likelihood_vals, 1)  #
-  BIC <- -2 * final_loglik + p * log(n)
-  return(list(pi = pi_hat, c = c_hat, r = r_hat, phi = phi_hat, 
-              tau = tau_hat, sigma_sq = sigma_sq, log_likelihood = log_likelihood_vals, W = W, BIC = BIC))
-  
+  return(list(
+    pi = pi_hat, c = c_hat, r = r_hat, 
+    phi = phi_hat, tau = tau_hat, sigma_sq = sigma_sq, 
+    log_likelihood = log_likelihood_vals[1:iter], 
+    W = W))
 }
+
+
+# Function to compute BIC for a given M
+FG_EM_with_BIC <- function(x, M, max_iter, tol) {
+  fit <- FG_EM(x, M, max_iter, tol)
+  
+  # Compute number of parameters (p)
+  n <- nrow(x)
+  d <- ncol(x)
+  p <- (M-1) + M*d + M + M*d + M + 1  
+  
+  # Get final log-likelihood
+  final_loglik <- tail(fit$log_likelihood, 1)
+  
+  # Compute BIC
+  BIC <- -2 * final_loglik + p * log(n)
+  
+  # Return model with BIC
+  return(list(
+    pi = fit$pi, c = fit$c, r = fit$r, phi = fit$phi,
+    tau = fit$tau, sigma_sq = fit$sigma_sq,
+    log_likelihood = fit$log_likelihood,
+    W = fit$W,
+    BIC = BIC,
+    n_parameters = p
+  ))
+}
+
+# Function to select best M based on BIC
+select_best_M <- function(x, M_range = 2:5, max_iter = 1000, tol = 1e-4) {
+  results <- list()
+  BICs <- numeric(length(M_range))
+  
+  for (i in seq_along(M_range)) {
+    M <- M_range[i]
+    message("Fitting M = ", M)
+    results[[i]] <- FG_EM_with_BIC(x, M, max_iter, tol)
+    BICs[i] <- results[[i]]$BIC
+  }
+  
+  # Find best M (lowest BIC)
+  best_idx <- which.min(BICs)
+  best_M <- M_range[best_idx]
+  
+  return(list(
+    best_model = results[[best_idx]],
+    all_results = results,
+    BICs = data.frame(M = M_range, BIC = BICs),
+    best_M = best_M
+  ))
+}
+
+
 
 
 ### Given the FG-mixture results and a number N, this function generates N samples from estimated density, and also provides scatter plots with and withour error of the same
