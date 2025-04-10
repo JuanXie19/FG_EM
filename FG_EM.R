@@ -1,6 +1,7 @@
 library(movMF)
 library(mvtnorm)
 library(matrixStats)
+library(Directional)
 
 
 
@@ -30,13 +31,8 @@ log_Cd <- function(tau, d) {
     return(-log(2) - (d/2) * log(pi) + lgamma(d/2))
   }
   
-  # Compute log_Cd(tau) for tau > 0
-  log_tau <- log(tau)
-  #bessel_term <- besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)
-  # Compute log_Cd(tau)
-  #res <- (d/2 - 1) * log_tau - log(bessel_term) - (d/2) * log(2*pi)
-  #log_bessel <- log(besselI(tau, nu = (d/2 - 1), expon.scaled = TRUE)) + tau
-  log_bessel <- log(besselI(tau, nu = (d/2 - 1), expon.scaled = FALSE)) 
+  # use expon.scale =T to avoid overflow
+  log_bessel <- log(besselI(tau, nu = (d/2 - 1), expon.scaled = TRUE))
   res <- (d/2 - 1) * log(tau) - log_bessel - (d/2) * log(2*pi)
   return(res)
 }
@@ -44,8 +40,7 @@ log_Cd <- function(tau, d) {
 
 
 # Function to calculates FG-kernel density given the parameters cntr(center), rd(radius), sigma.sq, phi(direction), tau(concentration)
-# this mainly comes for the FG paper code, but instead of using ((norm_vec(z))^2+rd^2-2*sigma.sq*dinom), I used ((norm_vec(z))^2 + rd^2)
-
+# this comes from the FG paper code. Note that we 
 FG_kernel <- function(x_i, c_k, r_k, sigma_sq, phi_k, tau_k) { 
   d <- length(x_i)
   
@@ -110,13 +105,13 @@ compute_y_expect <- function(x, M, phi, tau, c, r, sigma_sq) {
     # Compute kappa_k and mu_k
     kappa_k <- apply(nu, 1, norm_vec)
     # Handle cases where kappa_k is zero
-    kappa_k[kappa_k == 0] <- 1e-10  # Small value to avoid division by zero
+    kappa_k <- pmax(kappa_k, 1e-10)  # Small value to avoid division by zero
     mu_k <- nu / kappa_k
     
    
     # Compute A_d(kappa_k) using exponentially scaled Bessel functions for numerical stability
-    log_Ad_k <- log(besselI(kappa_k, d/2, expon.scaled = FALSE)) - 
-      log(besselI(kappa_k, d/2 - 1, expon.scaled = FALSE))
+    log_Ad_k <- log(besselI(kappa_k, d/2, expon.scaled = TRUE)) - 
+      log(besselI(kappa_k, d/2 - 1, expon.scaled = TRUE))
     Ad_k <- exp(log_Ad_k)
     Ad_k <- pmin(pmax(Ad_k, 1e-10), 1 - 1e-10)
     
@@ -173,9 +168,6 @@ log_likelihood <- function(x, pi_hat, c_hat, r_hat, phi_hat, tau_hat, sigma_sq) 
       log_lik[i, k] <- log(pi_hat[k]) + log(FG_kernel(x[i, ], c_hat[k, ], r_hat[k], sigma_sq, phi_hat[k, ], tau_hat[k])+1e-10)
     }
     temp[i] <- logSumExp(log_lik[i, ])  # Use logSumExp for numerical stability
-    if (i %% 10 == 0) {  # Print every 10 iterations to avoid too much output
-      cat(sprintf("🔹 Iteration %d: log-lik row sum = %f\n", i, temp[i]))
-    }
   }
   
   rst <- sum(temp)
@@ -184,6 +176,7 @@ log_likelihood <- function(x, pi_hat, c_hat, r_hat, phi_hat, tau_hat, sigma_sq) 
 
 
 
+## function to compute the posterior probability w_{ik}= P(z_i=k|x_i, Theta)
 ## function to compute the posterior probability w_{ik}= P(z_i=k|x_i, Theta)
 compute_W <- function(x, pi_hat, c_hat, r_hat, phi_hat, tau_hat, sigma_sq){
   n <- nrow(x)  # Number of data points

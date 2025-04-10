@@ -29,8 +29,7 @@ if(length(mt_idx)!=0){
 }
 
 
-DAT <- as.data.frame(t(counts))
-DAT$region <- brain$benmarklabel
+
 
 coords <- brain@images$image@coordinates
 coords <- coords[,1:2]
@@ -56,19 +55,31 @@ ggplot(dat,aes(row,col,col=region))+geom_point()
 
 ### WM
 dat.sub <- dat %>% filter(region =='WM')
+dat.sub <- dat %>% filter(region =='Layer6') # work
+dat.sub <- dat %>% filter(region =='Layer5') # work
+dat.sub <- dat %>% filter(region =='Layer4') # error
+dat.sub <- dat %>% filter(region =='Layer3') # 
+dat.sub <- dat %>% filter(region =='Layer2')
+dat.sub <- dat %>% filter(region =='Layer1')
 
 
 rst <- FG_EM(x = as.matrix(dat.sub[,1:2]), M = 4, max_iter =1000, tol = 1e-4 )
 
-rst2 <- FG_EM(x = as.matrix(dat.sub[,1:2]), M = 5, max_iter =1000, tol = 1e-4 )
+rst2 <- FG_EM(x = as.matrix(dat.sub[,1:2]), M = 2, max_iter =1000, tol = 1e-1 )
+rst3 <- select_best_M(x = as.matrix(dat.sub[, 1:2]), M_candidates = 2:6, max_iter = 1000, tol = 1e-1)
+
+
 
 
 ##### subset first, and then normalize
 dat <- data.frame(row = coords[,1],col = coords[,2],region = brain$benmarklabel)
 dat.sub <- dat %>% filter(region =='WM')
+dat.sub <- dat %>% filter(region =='Layer4')
+
+
 
 region.norm <- norm_coords(as.matrix(dat.sub[,1:2]),xmin = 0, xmax = 1,ymin = 0,ymax = 1)
-rst <- FG_EM(x = as.matrix(region.norm[, 1:2]), M = 5, max_iter = 1000, tol = 1e-4)
+rst <- FG_EM(x = as.matrix(region.norm[, 1:2]), M = 6, max_iter = 1000, tol = 1e-2)
 rst <- FG_EM(x = as.matrix(region.norm[, 1:2]), M = 3, max_iter = 1000, tol = 1e-3)
 
 
