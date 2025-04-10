@@ -175,8 +175,6 @@ log_likelihood <- function(x, pi_hat, c_hat, r_hat, phi_hat, tau_hat, sigma_sq) 
 }
 
 
-
-## function to compute the posterior probability w_{ik}= P(z_i=k|x_i, Theta)
 ## function to compute the posterior probability w_{ik}= P(z_i=k|x_i, Theta)
 compute_W <- function(x, pi_hat, c_hat, r_hat, phi_hat, tau_hat, sigma_sq){
   n <- nrow(x)  # Number of data points
