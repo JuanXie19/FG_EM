@@ -336,7 +336,7 @@ FG_EM <- function(x, M, max_iter, tol ){
 
 
 # Function to compute BIC for a given M
-FG_EM_with_BIC <- function(x, M, max_iter, tol) {
+FG_EM_with_criteria <- function(x, M, max_iter, tol) {
   fit <- FG_EM(x, M, max_iter, tol)
   
   # Compute number of parameters (p)
@@ -347,12 +347,14 @@ FG_EM_with_BIC <- function(x, M, max_iter, tol) {
   # Use the LAST (converged) log-likelihood value
   final_loglik <- tail(fit$log_likelihood, 1)
   
-  # Compute BIC
+  # Compute BIC and AIC
   BIC <- -2 * final_loglik + p * log(n)
+  AIC <- -2 * final_loglik + 2 * p
   
   # Return model with BIC
   return(list(
     model = fit,
+    AIC = AIC,
     BIC = BIC,
     n_parameters = p,
     converged_iter = fit$n_iter
@@ -362,33 +364,37 @@ FG_EM_with_BIC <- function(x, M, max_iter, tol) {
 # Updated model selection function
 select_best_M <- function(x, M_candidates = 2:5, max_iter = 100, tol = 1e-4) {
   results <- list()
-  BIC_df <- data.frame(M = M_candidates, 
-                       BIC = NA_real_,
-                       converged = NA,
-                       n_iter = NA)
+  criteria_df <- data.frame(M = M_candidates, 
+                            AIC = NA_real_,
+                            BIC = NA_real_,
+                            converged = NA,
+                            n_iter = NA)
   
   for (i in seq_along(M_candidates)) {
     M <- M_candidates[i]
     message("\nFitting M = ", M)
-    result <- FG_EM_with_BIC(x, M, max_iter, tol)
+    result <- FG_EM_with_criteria(x, M, max_iter, tol)
     
     results[[i]] <- result
-    BIC_df$BIC[i] <- result$BIC
-    BIC_df$converged[i] <- (result$model$n_iter < max_iter)
-    BIC_df$n_iter[i] <- result$model$n_iter
+    criteria_df$AIC[i] <- result$AIC
+    criteria_df$BIC[i] <- result$BIC
+    criteria_df$converged[i] <- (result$model$n_iter < max_iter)
+    criteria_df$n_iter[i] <- result$model$n_iter
   }
   
-  # Find best M (lowest BIC)
-  best_idx <- which.min(BIC_df$BIC)
+  # Find best M by both criteria
+  best_AIC_idx <- which.min(criteria_df$AIC)
+  best_BIC_idx <- which.min(criteria_df$BIC)
   
   return(list(
-    best_model = results[[best_idx]]$model,
-    best_M = M_candidates[best_idx],
+    best_model_AIC = results[[best_AIC_idx]]$model,
+    best_model_BIC = results[[best_BIC_idx]]$model,
+    best_M_AIC = M_candidates[best_AIC_idx],
+    best_M_BIC = M_candidates[best_BIC_idx],
     all_models = results,
-    BIC_table = BIC_df
+    criteria_table = criteria_df
   ))
 }
-
 
 
 ### Given the FG-mixture results and a number N, this function generates N samples from estimated density, and also provides scatter plots with and withour error of the same
