@@ -362,43 +362,54 @@ FG_EM_with_criteria <- function(x, M, max_iter, tol) {
 }
 
 # Updated model selection function
+
 select_best_M <- function(x, M_candidates = 2:5, max_iter = 100, tol = 1e-4) {
+  # Initialize storage
   results <- list()
-  criteria_df <- data.frame(M = M_candidates, 
-                            AIC = NA_real_,
-                            BIC = NA_real_,
-                            converged = NA,
-                            n_iter = NA)
+  criteria_df <- data.frame(
+    M = M_candidates, 
+    AIC = NA_real_,
+    BIC = NA_real_,
+    converged = NA,
+    n_iter = NA
+  )
   
+  # Fit models for all M candidates
   for (i in seq_along(M_candidates)) {
     M <- M_candidates[i]
     message("\nFitting M = ", M)
     result <- FG_EM_with_criteria(x, M, max_iter, tol)
     
-    results[[i]] <- result
+    # Store full results (including model, AIC, BIC, etc.)
+    results[[paste0("M_", M)]] <- result
+    
+    # Update criteria table
     criteria_df$AIC[i] <- result$AIC
     criteria_df$BIC[i] <- result$BIC
     criteria_df$converged[i] <- (result$model$n_iter < max_iter)
     criteria_df$n_iter[i] <- result$model$n_iter
   }
   
-  # Find best M by both criteria
+  # Find best M by AIC/BIC (optional, since we keep all results)
   best_AIC_idx <- which.min(criteria_df$AIC)
   best_BIC_idx <- which.min(criteria_df$BIC)
   
+  # Return ALL models + summary table
   return(list(
-    best_model_AIC = results[[best_AIC_idx]]$model,
-    best_model_BIC = results[[best_BIC_idx]]$model,
+    all_models = results,           # Full results for every M
+    criteria_table = criteria_df,    # Summary table
     best_M_AIC = M_candidates[best_AIC_idx],
     best_M_BIC = M_candidates[best_BIC_idx],
-    all_models = results,
-    criteria_table = criteria_df
+    best_model_AIC = results[[best_AIC_idx]]$model,  # Optional
+    best_model_BIC = results[[best_BIC_idx]]$model   # Optional
   ))
 }
 
 
+
+
 ### Given the FG-mixture results and a number N, this function generates N samples from estimated density, and also provides scatter plots with and withour error of the same
-plot_density_FGM <- function(N, rst){
+plot_density_FG_EM <- function(N, rst){
   cntr <- rst$c
   rd <- rst$r
   phi <- rst$phi

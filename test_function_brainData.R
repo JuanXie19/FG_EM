@@ -53,6 +53,7 @@ source('C:/Users/xie15/Downloads/CODE.R')
 
 ggplot(dat,aes(row,col,col=region))+geom_point()
 
+dir.out <- 'C:/project/power analysis/FG_EM/'
 
 ### WM
 REGIONS <- sort(unique(dat$region))
@@ -74,7 +75,7 @@ for (i in seq_along(REGIONS)) {
   # Run model selection
   rst <- select_best_M(
     x = as.matrix(dat.sub[, 1:2]),
-    M_candidates = 2:6,
+    M_candidates = 2:10,
     max_iter = 1000,
     tol = 1e-1
   )
@@ -92,6 +93,10 @@ for (i in seq_along(REGIONS)) {
   # Print progress
   cat(sprintf("Region: %s, Time: %.2f seconds, Best M: %d\n",
               REGIONS[i], duration, timing_results$best_M[i]))
+  
+  ## output results
+  saveRDS(rst, file = paste0(dir.out, 'humanbrain_151673_', REGIONS[i], '_FG_EM_fit.rds'))
+  
 }
 
 # Print summary
@@ -99,32 +104,61 @@ cat("\nTiming Summary:\n")
 print(timing_results)
 
 # Optionally save results
-write.csv(timing_results, "model_selection_timing_results_humanBrain151673.csv", row.names = FALSE)
-
-
-
-
-
-rst <- FG_EM(x = as.matrix(dat.sub[,1:2]), M = 4, max_iter =1000, tol = 1e-4 )
-
-
-
-
-##### subset first, and then normalize
-dat <- data.frame(row = coords[,1],col = coords[,2],region = brain$benmarklabel)
-dat.sub <- dat %>% filter(region =='WM')
-dat.sub <- dat %>% filter(region =='Layer4')
-
-
-
-region.norm <- norm_coords(as.matrix(dat.sub[,1:2]),xmin = 0, xmax = 1,ymin = 0,ymax = 1)
-rst <- FG_EM(x = as.matrix(region.norm[, 1:2]), M = 6, max_iter = 1000, tol = 1e-2)
-rst <- FG_EM(x = as.matrix(region.norm[, 1:2]), M = 3, max_iter = 1000, tol = 1e-3)
-
-
-rst3 <- select_best_M(x = as.matrix(region.norm[, 1:2]), M_candidates = 2:6, max_iter = 1000, tol = 1e-4)
-
+write.csv(timing_results, paste0(dir.out,"model_selection_timing_results_humanBrain151673.csv"), row.names = FALSE)
 plot_density_FGM(300, rst3$best_model)
+
+
+
+
+
+########running time for original FG 
+
+REGIONS <- sort(unique(dat$region))
+
+# Create a data frame to store timing results
+timing_results <- data.frame(
+  region = REGIONS,
+  time_seconds = numeric(length(REGIONS)),
+  best_M = numeric(length(REGIONS)),
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(REGIONS)) {
+  dat.sub <- dat %>% filter(region == REGIONS[i])  # Fixed typo: 'regions' to 'region'
+  
+  # Start timing
+  time_start <- Sys.time()
+  
+  # Run model selection
+  FGM <- FG_mixture(dat.sub[,1:2],Iter = 20000)
+  
+  # End timing
+  time_end <- Sys.time()
+  
+  # Calculate duration
+  duration <- as.numeric(time_end - time_start, units = "secs")
+  
+  # Store results
+  timing_results$time_seconds[i] <- duration
+  
+  
+  # Print progress
+  cat(sprintf("Region: %s, Time: %.2f seconds",
+              REGIONS[i], duration))
+  
+}
+
+# Print summary
+cat("\nTiming Summary:\n")
+print(timing_results)
+
+# Optionally save results
+write.csv(timing_results, paste0(dir.out,"FG_timing_results_humanBrain151673.csv"), row.names = FALSE)
+
+
+
+
+
 
 
 
@@ -156,17 +190,64 @@ coords.norm <- norm_coords(as.matrix(coords[,1:2]),xmin = 0, xmax = 1,ymin = 0,y
 
 dat <- data.frame(row = coords.norm[,1],col = coords.norm[,2],region = heart_D14$region)
 
-reg.simp <- regions
-reg.simp[2] <- 'Compact LV'
-reg.simp[5] <- 'Trabecular Lv'
+
+dir.out <- 'C:/project/power analysis/FG_EM/'
+
+### WM
+REGIONS <- sort(unique(dat$region))
+regime <- REGIONS
+regime[2] <- 'compactLV'
+regime[5] <-'TrabecularLV'
+
+# Create a data frame to store timing results
+timing_results <- data.frame(
+  region = REGIONS,
+  time_seconds = numeric(length(REGIONS)),
+  best_M = numeric(length(REGIONS)),
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(REGIONS)) {
+  dat.sub <- dat %>% filter(region == REGIONS[i])  # Fixed typo: 'regions' to 'region'
+  
+  # Start timing
+  time_start <- Sys.time()
+  
+  # Run model selection
+  rst <- select_best_M(
+    x = as.matrix(dat.sub[, 1:2]),
+    M_candidates = 2:7,
+    max_iter = 1000,
+    tol = 1e-1
+  )
+  
+  # End timing
+  time_end <- Sys.time()
+  
+  # Calculate duration
+  duration <- as.numeric(time_end - time_start, units = "secs")
+  
+  # Store results
+  timing_results$time_seconds[i] <- duration
+  timing_results$best_M[i] <- rst$best_M_BIC  # or rst$best_M_AIC if you prefer
+  
+  # Print progress
+  cat(sprintf("Region: %s, Time: %.2f seconds, Best M: %d\n",
+              REGIONS[i], duration, timing_results$best_M[i]))
+  
+  ## output results
+  saveRDS(rst, file = paste0(dir.out, 'chickenHeart_', regime[i], '_FG_EM_fit.rds'))
+  
+}
+
+# Print summary
+cat("\nTiming Summary:\n")
+print(timing_results)
+
+# Optionally save results
+write.csv(timing_results, paste0(dir.out,"model_selection_timing_results_chickenHeart_M2_7.csv"), row.names = FALSE)
 
 
-dat.sub <- dat %>% filter(region =='Atria') # work, M=3 is best when expon.scale =T, 
-dat.sub <- dat %>% filter(region =='Compact LV and \ninter-ventricular septum') # work, M= 6
-dat.sub <- dat %>% filter(region =='Epicardium') # work, M=2 is best, 
-dat.sub <- dat %>% filter(region =='Right ventricle') # M=2 is best
-dat.sub <- dat %>% filter(region =='Trabecular LV and \nendocardium') # 
-dat.sub <- dat %>% filter(region =='Valves') # work, M=4
 
 rst <- FG_EM(x = as.matrix(region.norm[, 1:2]), M = 3, max_iter = 1000, tol = 1e-3)
 
@@ -175,4 +256,8 @@ rst3 <- select_best_M(x = as.matrix(dat.sub[, 1:2]), M_candidates = 2:6, max_ite
 
 
 
-#####  test running time
+
+########### chicken heart
+
+dir.in <- 'C:/Users/xie15/Downloads/FG_EM_simulation/'
+
